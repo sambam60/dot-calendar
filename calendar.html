@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dot Calendar</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: black;
+      color: white;
+      font-family: monospace;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+      width: 90%; /* Increased from 90% */
+      max-width: 700px; /* Increased from 800px */
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(19, 1fr); /* Make it more square */
+      grid-template-rows: repeat(20, 1fr);    /* 19x20 ≈ 365 dots */
+      gap: 24px;
+      justify-content: center;
+      justify-items: center;
+      align-items: center;
+      padding: 15px;
+      border-radius: 5px;
+    }
+
+    .dot {
+      width: 5px;
+      height: 5px;
+      background-color: #444;
+      border-radius: 50%;
+      position: relative;
+      cursor: pointer;
+      transition: transform 0.2s, background-color 0.2s;
+    }
+
+    .dot:hover {
+      transform: scale(1.5);
+    }
+
+    .dot[data-date]:hover::after {
+      content: attr(data-name) " - " attr(data-date);
+      position: absolute;
+      top: -25px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: black;
+      color: white;
+      padding: 2px 5px;
+      font-size: 10px;
+      border-radius: 3px;
+      white-space: nowrap;
+    }
+
+    .footer {
+      display: flex;
+      justify-content: space-between;
+      width: calc(100% - 169px); /* Reduced width to move elements inward */
+      font-size: 14px;
+      padding: 0 50px; /* Increased padding to move elements inward */
+    }
+
+    #dot-editor {
+      display: none;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 10;
+      background: black;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+      color: white;
+    }
+
+    #dot-editor input[type="text"] {
+      width: 100%;
+      margin-bottom: 10px;
+      padding: 5px;
+      background: #333;
+      border: 1px solid #555;
+      color: white;
+    }
+
+    #dot-editor input[type="color"] {
+      width: 100%;
+      height: 40px;
+      margin-bottom: 10px;
+      background: black;
+      border: 1px solid #555;
+    }
+
+    #dot-editor button {
+      width: 100%;
+      padding: 5px;
+      background: #333;
+      border: none;
+      color: white;
+      cursor: pointer;
+    }
+
+    @media only screen and (max-width: 768px) {
+      .dot {
+        width: 6px;
+        height: 6px;
+      }
+      .grid {
+        gap: 10px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="grid" id="grid"></div>
+    <div class="footer">
+      <span>2025</span>
+      <span id="days-left"><span id="days-number"></span><span style="color: #3c3c3c"> days left</span></span>
+    </div>
+  </div>
+
+  <div id="dot-editor">
+    <label for="name-input">Name:</label>
+    <input type="text" id="name-input">
+    <label for="color-input">Color:</label>
+    <input type="color" id="color-input">
+    <button id="apply-changes">Apply</button>
+  </div>
+
+  <script>
+    const grid = document.getElementById('grid');
+    const dotEditor = document.getElementById('dot-editor');
+    const nameInput = document.getElementById('name-input');
+    const colorInput = document.getElementById('color-input');
+    const applyChangesButton = document.getElementById('apply-changes');
+    let selectedDot = null;
+
+    // Generate all days and their corresponding dots
+    const currentDay = Math.ceil((new Date() - new Date('2025-01-01')) / (1000 * 60 * 60 * 24)) + 1;
+    for (let i = 1; i <= 365; i++) {
+      const date = new Date(2025, 0, i);
+      const dot = document.createElement('div');
+      dot.classList.add('dot');
+      dot.dataset.day = i;
+      dot.dataset.date = date.toDateString();
+
+      if (i <= currentDay) {
+        dot.style.backgroundColor = 'white';
+      }
+
+      grid.appendChild(dot);
+    }
+
+    // Click a dot to open the editor
+    grid.addEventListener('click', event => {
+      const dot = event.target.closest('.dot');
+      if (dot) {
+        selectedDot = dot;
+        nameInput.value = dot.dataset.name || '';
+        colorInput.value = dot.style.backgroundColor || '#444444';
+        dotEditor.style.display = 'block';
+      }
+    });
+
+    // Apply changes
+    applyChangesButton.addEventListener('click', () => {
+      if (selectedDot) {
+        const name = nameInput.value;
+        const color = colorInput.value;
+        selectedDot.dataset.name = name;
+        selectedDot.style.backgroundColor = color;
+        selectedDot.dataset.color = color;
+        saveDotState();
+        dotEditor.style.display = 'none';
+      }
+    });
+
+    // Save dot state to cookies
+    function saveDotState() {
+      const dotData = Array.from(grid.children).map(dot => ({
+        day: dot.dataset.day,
+        color: dot.dataset.color || null,
+        name: dot.dataset.name || null,
+      }));
+      document.cookie = `dots=${JSON.stringify(dotData)}; path=/; max-age=${60 * 60 * 24 * 365}`;
+    }
+
+    // Load dot state from cookies
+    function loadDotState() {
+      const cookie = document.cookie
+        .split('; ')
+        .find(row => row.startsWith('dots='));
+      if (cookie) {
+        const dotData = JSON.parse(cookie.split('=')[1]);
+        dotData.forEach(({ day, color, name }) => {
+          const dot = grid.querySelector(`.dot[data-day='${day}']`);
+          if (dot) {
+            if (color) dot.style.backgroundColor = color;
+            if (name) dot.dataset.name = name;
+          }
+        });
+      }
+    }
+
+    // Hide editor when clicking outside
+    document.addEventListener('click', event => {
+      if (!dotEditor.contains(event.target) && event.target !== selectedDot) {
+        dotEditor.style.display = 'none';
+      }
+    });
+
+    // Load saved state on page load
+    loadDotState();
+
+    // Update days left
+    const daysLeft = 365 - currentDay;
+    document.getElementById('days-number').textContent = daysLeft;
+  </script>
+</body>
+</html>
